@@ -13,7 +13,7 @@ import {signin} from './../store/actions';
 
 // https://github.com/facebook/react-native-fbsdk
 
-const {width, height} = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 
 function SignInScreen(props) {
   const imageRunning = require('../images/running.jpg');
@@ -26,19 +26,39 @@ function SignInScreen(props) {
     } else if (result.isCancelled) {
       console.log('login is cancelled.');
     } else {
-      console.log(result);
       AccessToken.getCurrentAccessToken().then(async (data) => {
-        const response = await fetch(
+        const responseFacebook = await fetch(
           `https://graph.facebook.com/me?fields=email,name&access_token=${data.accessToken}`,
         );
 
-        const resp = await response.json();
-        console.log(resp);
+        const respFacebook = await responseFacebook.json();
+
+        const responseBackend = await fetch(
+          'http://10.0.2.2/api/v1/users/external',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8',
+            },
+            body: JSON.stringify({
+              external_user_id: respFacebook.id,
+              external_source: 'facebook',
+              email: respFacebook.email,
+              full_name: respFacebook.name,
+              token: data.accessToken,
+            }),
+          },
+        );
+
+        const respBackend = await responseBackend.json();
+
         props.signinUser({
           auth: true,
           accessToken: data.accessToken,
-          name: resp.name,
-          email: resp.email,
+          name: respFacebook.name,
+          email: respFacebook.email,
+          facebookUserId: respFacebook.id,
+          id: respBackend.id,
         });
       });
     }
@@ -97,14 +117,14 @@ const styles = StyleSheet.create({
     alignContent: 'center',
   },
   headline: {
-    textAlign: 'center', // <-- the magic
+    textAlign: 'center',
     fontWeight: 'bold',
     fontSize: 30,
     marginTop: 10,
     width: '100%',
   },
   smallHeadline: {
-    textAlign: 'center', // <-- the magic
+    textAlign: 'center',
     fontWeight: 'bold',
     fontSize: 20,
     marginTop: 10,
